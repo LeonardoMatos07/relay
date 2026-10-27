@@ -99,6 +99,39 @@ curl -X POST localhost:8091/admin/config -d '{"outage": false, "failureRate": 0.
 curl -X POST localhost:8091/admin/reset
 ```
 
+## Real providers
+
+Besides the simulated gateways, Relay ships adapters for **Amazon SES** (e-mail) and
+**Twilio** (SMS and WhatsApp). The router, retries, rate limits and circuit breakers do not
+know which is which: each provider in the config has a `type` (`http`, `ses`, `twilio`) and
+the dispatcher picks the adapter.
+
+```bash
+cp .env.example .env                                         # credentials, never committed
+cp config/providers.real.example.json config/providers.real.json   # your sender and numbers
+make up
+curl -i localhost:3000/v1/messages -H 'content-type: application/json' \
+  -d '{"channel":"sms","to":"+55719XXXXXXXX","body":"Hello from Relay"}'
+```
+
+In the example config the real providers are **priority 1** and the simulators are
+**priority 2**, so a Twilio or SES failure shows failover with a real provider in the loop.
+
+|                  | Amazon SES                                                                                 | Twilio                                                                                                                              |
+| ---------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Credentials      | AWS default chain: `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` locally, an IAM role on EKS | `TWILIO_ACCOUNT_SID` + API key (`TWILIO_API_KEY_SID`/`_SECRET`) or `TWILIO_AUTH_TOKEN`; `credentialsPrefix` allows several accounts |
+| Sandbox / trial  | Only verified recipients; about 1 message/s                                                | Only verified numbers; enable Brazil in SMS geo permissions; WhatsApp through the Twilio sandbox number                             |
+| Message id       | SES `MessageId`; Relay id sent as tag `relay_message_id`                                   | Twilio `sid`                                                                                                                        |
+| Permanent errors | `MessageRejected` (e.g. unverified recipient)                                              | 21211 invalid number, 21610 unsubscribed, 21614 not mobile, 21608 unverified (trial)…                                               |
+| Fail over        | Unverified sender, suspended or paused account, throttling, 5xx, timeouts                  | Invalid sender (21606, 21659), auth failure, 429, 5xx, timeouts                                                                     |
+
+The SDK's own retries are disabled for SES (`maxAttempts: 1`), so attempts are not multiplied
+by stacked retry layers. Neither SES nor Twilio's Messages API accepts an idempotency key, so
+for them the duplicate window described in [ADR 3](docs/adr/0003-at-least-once-with-idempotency-at-every-hop.md)
+applies.
+
+The e2e tests and load tests always use the simulated providers (`config/providers.json`).
+
 ## API
 
 | Method | Path                            |                                                                                                                                                                                 |
@@ -153,6 +186,7 @@ src/
   publisher/   outbox → Kafka, leader election
   worker/      Kafka consumers, delivery, provider client, rate limiter
   infra/       Postgres, Kafka, Redis, metrics, health, migrations
+  worker/providers/  adapters: http (simulators), Amazon SES, Twilio
   mock-provider/  dependency-free fake gateway with runtime-controllable failures
 test/e2e/      end-to-end tests that cause real outages through the mocks
 load/          k6 scenario and the Prometheus report

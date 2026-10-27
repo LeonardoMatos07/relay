@@ -21,6 +21,9 @@ export function classifyHttpStatus(status: number, detail = ''): DeliveryError {
   const msg = `provider answered ${status}${detail ? `: ${detail}` : ''}`;
   if (status === 429) return new DeliveryError(msg, true, true, status);
   if (status === 408) return new DeliveryError(msg, true, true, status);
+  // Our credentials or account at this provider are broken: the message is fine, the provider
+  // is unusable. Retryable (so it fails over) and it counts (so the circuit opens).
+  if (status === 401 || status === 403) return new DeliveryError(msg, true, true, status);
   if (status >= 500) return new DeliveryError(msg, true, true, status);
   if (status >= 400) return new DeliveryError(msg, false, false, status);
   return new DeliveryError(msg, true, true, status);

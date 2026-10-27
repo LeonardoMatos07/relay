@@ -169,6 +169,18 @@ describe('parseProviders', () => {
     );
   });
 
+  it('validates settings per provider type', () => {
+    const base = { name: 'x', priority: 1, ratePerSecond: 1 };
+    assert.throws(() => parseProviders([{ ...base, channel: 'email', type: 'ses' }]), /ses\.region.*\n.*ses\.from/s);
+    assert.throws(() => parseProviders([{ ...base, channel: 'push', type: 'twilio', twilio: {} }]), /twilio sends sms/);
+    assert.throws(() => parseProviders([{ ...base, channel: 'sms', type: 'twilio', twilio: {} }]), /needs from/);
+    assert.equal(
+      parseProviders([{ ...base, channel: 'email', type: 'ses', ses: { region: 'sa-east-1', from: 'a@b.co' } }]).length,
+      1,
+    );
+    assert.equal(parseProviders([{ ...base, channel: 'sms', type: 'twilio', twilio: { from: '+1' } }]).length, 1);
+  });
+
   it('rejects duplicate names', () => {
     assert.throws(() => new ProviderRouter([providers[0]!, providers[0]!]), /duplicate/);
   });

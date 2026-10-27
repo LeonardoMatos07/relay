@@ -4,3 +4,4 @@ dist-test/
 .env
 *.log
 load/results/*.json
+config/providers.real.json

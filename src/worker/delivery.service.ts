@@ -2,15 +2,17 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Config, CONFIG } from '../config';
 import { DeliveryError, InfrastructureError } from '../core/delivery-error';
 import { MessageEnvelope, partitionKey, topics } from '../core/message';
-import { ProviderConfig, ProviderRouter } from '../core/provider-router';
+import { ProviderCall, ProviderConfig, ProviderRouter } from '../core/provider-router';
 import { decideRetry } from '../core/retry-policy';
 import { KafkaService } from '../infra/kafka.service';
 import { deadLettered, deliveries, duplicatesSkipped, endToEndLatency, retriesScheduled } from '../infra/metrics';
-import { callProvider } from './provider-client';
 import { RateLimiter } from './rate-limiter.service';
 import { WorkerRepository } from './worker.repository';
 
 export const NOT_BEFORE_HEADER = 'not-before';
+
+/** Injection token for the adapter dispatcher (see providers/index.ts). */
+export const PROVIDER_CALL = Symbol('PROVIDER_CALL');
 
 /**
  * One delivery attempt for one message: route it to a provider (with failover), then record
@@ -29,6 +31,7 @@ export class DeliveryService {
     private readonly limiter: RateLimiter,
     private readonly repository: WorkerRepository,
     private readonly kafka: KafkaService,
+    @Inject(PROVIDER_CALL) private readonly callProvider: ProviderCall,
   ) {}
 
   async handle(envelope: MessageEnvelope): Promise<void> {
@@ -95,6 +98,6 @@ export class DeliveryService {
       // Saturated, not broken: retryable, and it must not count against the provider's circuit.
       throw new DeliveryError(`rate limit reached for ${provider.name}`, true, false, 429);
     }
-    return callProvider(provider, envelope);
+    return this.callProvider(provider, envelope);
   }
 }

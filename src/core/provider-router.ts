@@ -2,10 +2,19 @@ import { BreakerOptions, BreakerState, CircuitBreaker, DEFAULT_BREAKER } from '.
 import { DeliveryError, InfrastructureError, NoProviderAvailableError } from './delivery-error';
 import { Channel, MessageEnvelope } from './message';
 
+export const PROVIDER_TYPES = ['http', 'ses', 'twilio'] as const;
+export type ProviderType = (typeof PROVIDER_TYPES)[number];
+
 export interface ProviderConfig {
   name: string;
   channel: Channel;
-  url: string;
+  /**
+   * Which adapter talks to this provider. `http` is the generic JSON contract spoken by the
+   * simulated providers; `ses` and `twilio` call the real services. Defaults to `http`.
+   */
+  type?: ProviderType;
+  /** Base URL, required for `http`. */
+  url?: string;
   /** Lower is preferred. Providers with the same priority share traffic by weight. */
   priority: number;
   /** Relative share among providers of the same priority. Defaults to 1. */
@@ -15,6 +24,25 @@ export interface ProviderConfig {
   /** Burst size of the token bucket. Defaults to ratePerSecond. */
   burst?: number;
   timeoutMs?: number;
+  /** Amazon SES settings, required for `ses`. Credentials come from the AWS default chain. */
+  ses?: {
+    region: string;
+    /** Verified sender, e.g. "Relay <no-reply@example.com>". */
+    from: string;
+    configurationSet?: string;
+  };
+  /** Twilio settings, required for `twilio`. */
+  twilio?: {
+    /** Sender number in E.164, or "whatsapp:+1..." for WhatsApp. Either this or messagingServiceSid. */
+    from?: string;
+    messagingServiceSid?: string;
+    /**
+     * Prefix of the environment variables holding the credentials, so several Twilio accounts
+     * can coexist: <PREFIX>_ACCOUNT_SID plus <PREFIX>_API_KEY_SID/<PREFIX>_API_KEY_SECRET
+     * (preferred) or <PREFIX>_AUTH_TOKEN. Defaults to TWILIO.
+     */
+    credentialsPrefix?: string;
+  };
 }
 
 export interface SendResult {
@@ -149,11 +177,31 @@ export function parseProviders(raw: unknown): ProviderConfig[] {
     const where = `providers[${i}]`;
     if (typeof p !== 'object' || p === null) return errors.push(`${where} must be an object`);
     const c = p as Record<string, unknown>;
+    const type = (c.type ?? 'http') as string;
     if (typeof c.name !== 'string' || !c.name) errors.push(`${where}.name is required`);
     if (!['email', 'sms', 'whatsapp', 'push'].includes(c.channel as string)) errors.push(`${where}.channel is invalid`);
-    if (typeof c.url !== 'string' || !/^https?:\/\//.test(c.url)) errors.push(`${where}.url must be http(s)`);
+    if (!(PROVIDER_TYPES as readonly string[]).includes(type))
+      errors.push(`${where}.type must be one of ${PROVIDER_TYPES.join(', ')}`);
     if (!Number.isInteger(c.priority)) errors.push(`${where}.priority must be an integer`);
     if (typeof c.ratePerSecond !== 'number' || c.ratePerSecond <= 0) errors.push(`${where}.ratePerSecond must be > 0`);
+
+    if (type === 'http' && (typeof c.url !== 'string' || !/^https?:\/\//.test(c.url))) {
+      errors.push(`${where}.url must be http(s)`);
+    }
+    if (type === 'ses') {
+      const ses = c.ses as Record<string, unknown> | undefined;
+      if (c.channel !== 'email') errors.push(`${where}: ses only sends email`);
+      if (typeof ses?.region !== 'string' || !ses.region) errors.push(`${where}.ses.region is required`);
+      if (typeof ses?.from !== 'string' || !ses.from.includes('@'))
+        errors.push(`${where}.ses.from must be an e-mail address`);
+    }
+    if (type === 'twilio') {
+      const tw = c.twilio as Record<string, unknown> | undefined;
+      if (c.channel !== 'sms' && c.channel !== 'whatsapp') errors.push(`${where}: twilio sends sms or whatsapp`);
+      if (typeof tw?.from !== 'string' && typeof tw?.messagingServiceSid !== 'string') {
+        errors.push(`${where}.twilio needs from or messagingServiceSid`);
+      }
+    }
     return undefined;
   });
   if (errors.length > 0) throw new Error(`invalid providers config:\n- ${errors.join('\n- ')}`);

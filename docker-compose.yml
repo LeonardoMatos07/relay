@@ -107,12 +107,16 @@ services:
     environment:
       <<: *app-env
       APP_ROLE: worker
-      PROVIDERS_FILE: /config/providers.json
+      # Simulated providers by default; set PROVIDERS=providers.real.json in .env for SES/Twilio.
+      PROVIDERS_FILE: /config/${PROVIDERS:-providers.json}
       DATABASE_POOL_SIZE: '40'
       WORKER_KEY_CONCURRENCY: '64'
       WORKER_PARTITION_CONCURRENCY: '6'
+    env_file:
+      - path: .env
+        required: false
     volumes:
-      - ./config/providers.json:/config/providers.json:ro
+      - ./config:/config:ro
     depends_on:
       migrate:
         condition: service_completed_successfully

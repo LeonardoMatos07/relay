@@ -11,7 +11,8 @@ import { OpsController } from './infra/ops.controller';
 import { RedisService } from './infra/redis.service';
 import { OutboxPublisher } from './publisher/outbox-publisher.service';
 import { ConsumerService } from './worker/consumer.service';
-import { DeliveryService } from './worker/delivery.service';
+import { DeliveryService, PROVIDER_CALL } from './worker/delivery.service';
+import { createProviderDispatcher } from './worker/providers/index';
 import { RateLimiter } from './worker/rate-limiter.service';
 import { WorkerRepository } from './worker/worker.repository';
 
@@ -42,6 +43,7 @@ export class AppModule {
               return router;
             },
           },
+          { provide: PROVIDER_CALL, useFactory: () => createProviderDispatcher(config.providers) },
           RateLimiter,
           WorkerRepository,
           DeliveryService,

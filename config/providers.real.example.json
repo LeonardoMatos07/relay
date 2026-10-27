@@ -1,0 +1,61 @@
+[
+  {
+    "name": "ses",
+    "type": "ses",
+    "channel": "email",
+    "priority": 1,
+    "ratePerSecond": 1,
+    "burst": 1,
+    "ses": { "region": "sa-east-1", "from": "Relay <no-reply@your-verified-domain.com>" }
+  },
+  {
+    "name": "email-alpha",
+    "channel": "email",
+    "url": "http://email-alpha:8080",
+    "priority": 2,
+    "ratePerSecond": 2000,
+    "burst": 400
+  },
+  {
+    "name": "twilio-sms",
+    "type": "twilio",
+    "channel": "sms",
+    "priority": 1,
+    "ratePerSecond": 1,
+    "burst": 1,
+    "twilio": { "from": "+15550000000" }
+  },
+  {
+    "name": "sms-alpha",
+    "channel": "sms",
+    "url": "http://sms-alpha:8080",
+    "priority": 2,
+    "ratePerSecond": 1500,
+    "burst": 300
+  },
+  {
+    "name": "twilio-whatsapp",
+    "type": "twilio",
+    "channel": "whatsapp",
+    "priority": 1,
+    "ratePerSecond": 1,
+    "burst": 1,
+    "twilio": { "from": "whatsapp:+14155238886" }
+  },
+  {
+    "name": "whatsapp-alpha",
+    "channel": "whatsapp",
+    "url": "http://whatsapp-alpha:8080",
+    "priority": 2,
+    "ratePerSecond": 1000,
+    "burst": 200
+  },
+  {
+    "name": "push-alpha",
+    "channel": "push",
+    "url": "http://push-alpha:8080",
+    "priority": 1,
+    "ratePerSecond": 3000,
+    "burst": 600
+  }
+]

@@ -28,6 +28,7 @@ The pipeline is at-least-once, and each hop removes the duplicates it can:
 - No acknowledged message is lost, and the common duplicate paths are closed.
 - One window remains: a worker that dies after the provider accepted, sending to a provider
   that ignores idempotency keys, can cause a duplicate. That is the inherent limit of talking
-  to an external system, and it is stated in the README.
+  to an external system, and it is stated in the README. Amazon SES (`SendEmail`) and Twilio's
+  Messages API are such providers; the simulated providers honour the key.
 - Each delivery costs one extra primary-key read (`isFinal`). Cheap compared with an HTTP call
   to a provider, and it keeps duplicates out of the provider bill.
