@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: relay-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app.kubernetes.io/name: relay-api }
+  strategy:
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: relay-api }
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '3000'
+        prometheus.io/path: /metrics
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext: { runAsNonRoot: true, runAsUser: 1000 }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app.kubernetes.io/name: relay-api }
+      containers:
+        - name: api
+          image: relay
+          ports: [{ name: http, containerPort: 3000 }]
+          envFrom:
+            - configMapRef: { name: relay-config }
+            - secretRef: { name: relay-secrets }
+          env:
+            - { name: APP_ROLE, value: api }
+            - { name: DATABASE_POOL_SIZE, value: '20' }
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 5
+            failureThreshold: 2
+          livenessProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 10
+            failureThreshold: 6
+          resources:
+            requests: { cpu: 250m, memory: 192Mi }
+            limits: { memory: 384Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: relay-api
+spec:
+  selector: { app.kubernetes.io/name: relay-api }
+  ports: [{ name: http, port: 80, targetPort: http }]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: relay-api
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: relay-api }
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: relay-api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: relay-api }

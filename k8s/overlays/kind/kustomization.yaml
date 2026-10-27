@@ -1,0 +1,17 @@
+# Local cluster (kind): the base plus single-node Kafka (Redpanda), Postgres, Redis and the
+# simulated providers. Production would point the same base at managed services instead.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: relay
+resources:
+  - ../../base
+  - infra.yaml
+  - mock-providers.yaml
+secretGenerator:
+  - name: relay-secrets
+    literals:
+      - DATABASE_URL=postgres://relay:relay@postgres:5432/relay
+configMapGenerator:
+  - name: relay-providers
+    files:
+      - providers.json

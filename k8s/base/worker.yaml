@@ -1,0 +1,87 @@
+# Workers scale horizontally up to the number of partitions per topic (TOPIC_PARTITIONS):
+# beyond that, extra consumers in the group sit idle. CPU-based HPA is the portable default;
+# in production, KEDA's Kafka scaler (consumer lag) reacts to backlog rather than CPU.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: relay-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app.kubernetes.io/name: relay-worker }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: relay-worker }
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '3000'
+        prometheus.io/path: /metrics
+    spec:
+      # Long enough to finish the in-flight batch and commit offsets before SIGKILL.
+      terminationGracePeriodSeconds: 60
+      securityContext: { runAsNonRoot: true, runAsUser: 1000 }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app.kubernetes.io/name: relay-worker }
+      containers:
+        - name: worker
+          image: relay
+          ports: [{ name: http, containerPort: 3000 }]
+          envFrom:
+            - configMapRef: { name: relay-config }
+            - secretRef: { name: relay-secrets }
+          env:
+            - { name: APP_ROLE, value: worker }
+            - { name: PROVIDERS_FILE, value: /config/providers.json }
+            - { name: DATABASE_POOL_SIZE, value: '30' }
+            - { name: WORKER_KEY_CONCURRENCY, value: '64' }
+            - { name: WORKER_PARTITION_CONCURRENCY, value: '6' }
+          volumeMounts:
+            - { name: providers, mountPath: /config, readOnly: true }
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 10
+            failureThreshold: 6
+          resources:
+            requests: { cpu: 300m, memory: 256Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+      volumes:
+        - name: providers
+          configMap: { name: relay-providers }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: relay-worker
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: relay-worker }
+  minReplicas: 2
+  maxReplicas: 12
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 65 }
+  behavior:
+    scaleDown:
+      # Every scale event rebalances the consumer group; avoid flapping.
+      stabilizationWindowSeconds: 300
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: relay-worker
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: relay-worker }

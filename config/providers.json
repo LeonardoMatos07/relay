@@ -1,0 +1,52 @@
+[
+  {
+    "name": "sms-alpha",
+    "channel": "sms",
+    "url": "http://sms-alpha:8080",
+    "priority": 1,
+    "weight": 3,
+    "ratePerSecond": 1500,
+    "burst": 300
+  },
+  {
+    "name": "sms-beta",
+    "channel": "sms",
+    "url": "http://sms-beta:8080",
+    "priority": 1,
+    "weight": 1,
+    "ratePerSecond": 500,
+    "burst": 100
+  },
+  {
+    "name": "email-alpha",
+    "channel": "email",
+    "url": "http://email-alpha:8080",
+    "priority": 1,
+    "ratePerSecond": 2000,
+    "burst": 400
+  },
+  {
+    "name": "email-beta",
+    "channel": "email",
+    "url": "http://email-beta:8080",
+    "priority": 2,
+    "ratePerSecond": 1000,
+    "burst": 200
+  },
+  {
+    "name": "whatsapp-alpha",
+    "channel": "whatsapp",
+    "url": "http://whatsapp-alpha:8080",
+    "priority": 1,
+    "ratePerSecond": 1000,
+    "burst": 200
+  },
+  {
+    "name": "push-alpha",
+    "channel": "push",
+    "url": "http://push-alpha:8080",
+    "priority": 1,
+    "ratePerSecond": 3000,
+    "burst": 600
+  }
+]

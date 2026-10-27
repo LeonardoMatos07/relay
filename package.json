@@ -1,0 +1,39 @@
+{
+  "name": "relay",
+  "version": "0.1.0",
+  "description": "High-throughput multi-channel messaging service: transactional outbox, Kafka, provider failover, fleet-wide rate limiting",
+  "private": true,
+  "license": "MIT",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "rm -rf dist-test && tsc -p tsconfig.json --outDir dist-test && node --test \"dist-test/**/*.spec.js\"",
+    "test:e2e": "node --test \"test/e2e/*.e2e.mjs\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "start": "node dist/main.js",
+    "start:mock": "node dist/mock-provider/main.js"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "ioredis": "^5.4.1",
+    "kafkajs": "^2.2.4",
+    "pg": "^8.13.0",
+    "prom-client": "^15.1.3",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "prettier": "^3.3.3",
+    "typescript": "^5.7.2"
+  }
+}

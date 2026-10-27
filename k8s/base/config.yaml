@@ -1,0 +1,12 @@
+# Non-secret settings shared by every role. Connection strings with credentials come from the
+# `relay-secrets` Secret (DATABASE_URL), created per environment (see overlays/).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: relay-config
+data:
+  KAFKA_BROKERS: redpanda:9092
+  REDIS_URL: redis://redis:6379
+  TOPIC_PARTITIONS: '24'
+  TOPIC_REPLICATION: '1'
+  LOG_FORMAT: json

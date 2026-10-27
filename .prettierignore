@@ -1,0 +1,5 @@
+dist
+dist-test
+node_modules
+pnpm-lock.yaml
+ops/grafana/dashboards

@@ -1,0 +1,204 @@
+# Simulated providers, same image as the app (node dist/mock-provider/main.js).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sms-alpha
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: sms-alpha }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: sms-alpha }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 1000 }
+      containers:
+        - name: mock
+          image: relay
+          command: ['node', 'dist/mock-provider/main.js']
+          env:
+            - { name: PROVIDER_NAME, value: sms-alpha }
+            - { name: LATENCY_MS, value: '60' }
+            - { name: JITTER_MS, value: '30' }
+            - { name: FAILURE_RATE, value: '0.01' }
+          ports: [{ containerPort: 8080 }]
+          resources:
+            requests: { cpu: 100m, memory: 96Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sms-alpha
+spec:
+  selector: { app.kubernetes.io/name: sms-alpha }
+  ports: [{ port: 8080, targetPort: 8080 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sms-beta
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: sms-beta }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: sms-beta }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 1000 }
+      containers:
+        - name: mock
+          image: relay
+          command: ['node', 'dist/mock-provider/main.js']
+          env:
+            - { name: PROVIDER_NAME, value: sms-beta }
+            - { name: LATENCY_MS, value: '90' }
+            - { name: JITTER_MS, value: '40' }
+            - { name: FAILURE_RATE, value: '0.02' }
+          ports: [{ containerPort: 8080 }]
+          resources:
+            requests: { cpu: 100m, memory: 96Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sms-beta
+spec:
+  selector: { app.kubernetes.io/name: sms-beta }
+  ports: [{ port: 8080, targetPort: 8080 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: email-alpha
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: email-alpha }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: email-alpha }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 1000 }
+      containers:
+        - name: mock
+          image: relay
+          command: ['node', 'dist/mock-provider/main.js']
+          env:
+            - { name: PROVIDER_NAME, value: email-alpha }
+            - { name: LATENCY_MS, value: '40' }
+            - { name: JITTER_MS, value: '20' }
+            - { name: FAILURE_RATE, value: '0' }
+          ports: [{ containerPort: 8080 }]
+          resources:
+            requests: { cpu: 100m, memory: 96Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: email-alpha
+spec:
+  selector: { app.kubernetes.io/name: email-alpha }
+  ports: [{ port: 8080, targetPort: 8080 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: email-beta
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: email-beta }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: email-beta }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 1000 }
+      containers:
+        - name: mock
+          image: relay
+          command: ['node', 'dist/mock-provider/main.js']
+          env:
+            - { name: PROVIDER_NAME, value: email-beta }
+            - { name: LATENCY_MS, value: '70' }
+            - { name: JITTER_MS, value: '30' }
+            - { name: FAILURE_RATE, value: '0' }
+          ports: [{ containerPort: 8080 }]
+          resources:
+            requests: { cpu: 100m, memory: 96Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: email-beta
+spec:
+  selector: { app.kubernetes.io/name: email-beta }
+  ports: [{ port: 8080, targetPort: 8080 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whatsapp-alpha
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: whatsapp-alpha }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: whatsapp-alpha }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 1000 }
+      containers:
+        - name: mock
+          image: relay
+          command: ['node', 'dist/mock-provider/main.js']
+          env:
+            - { name: PROVIDER_NAME, value: whatsapp-alpha }
+            - { name: LATENCY_MS, value: '120' }
+            - { name: JITTER_MS, value: '60' }
+            - { name: FAILURE_RATE, value: '0.005' }
+          ports: [{ containerPort: 8080 }]
+          resources:
+            requests: { cpu: 100m, memory: 96Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: whatsapp-alpha
+spec:
+  selector: { app.kubernetes.io/name: whatsapp-alpha }
+  ports: [{ port: 8080, targetPort: 8080 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: push-alpha
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: push-alpha }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: push-alpha }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 1000 }
+      containers:
+        - name: mock
+          image: relay
+          command: ['node', 'dist/mock-provider/main.js']
+          env:
+            - { name: PROVIDER_NAME, value: push-alpha }
+            - { name: LATENCY_MS, value: '25' }
+            - { name: JITTER_MS, value: '10' }
+            - { name: FAILURE_RATE, value: '0' }
+          ports: [{ containerPort: 8080 }]
+          resources:
+            requests: { cpu: 100m, memory: 96Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: push-alpha
+spec:
+  selector: { app.kubernetes.io/name: push-alpha }
+  ports: [{ port: 8080, targetPort: 8080 }]

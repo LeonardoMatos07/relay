@@ -1,0 +1,61 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: pnpm test
+
+  manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render kustomize overlays
+        run: |
+          kubectl kustomize k8s/base > /dev/null
+          kubectl kustomize k8s/overlays/kind > /dev/null
+
+  e2e:
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Start the stack
+        run: docker compose up -d --build redpanda postgres redis migrate api publisher worker sms-alpha sms-beta email-alpha email-beta whatsapp-alpha push-alpha
+      - name: Wait for readiness
+        run: |
+          for i in $(seq 1 60); do
+            curl -fs localhost:3000/health/ready && curl -fs localhost:3001/health/ready && exit 0
+            sleep 2
+          done
+          exit 1
+      - run: pnpm test:e2e
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --tail=200 api publisher worker
