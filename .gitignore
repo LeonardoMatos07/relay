@@ -5,3 +5,8 @@ dist-test/
 *.log
 load/results/*.json
 config/providers.real.json
+# Terraform: state may hold the IAM access key secret
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars

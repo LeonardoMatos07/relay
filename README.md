@@ -130,6 +130,9 @@ by stacked retry layers. Neither SES nor Twilio's Messages API accepts an idempo
 for them the duplicate window described in [ADR 3](docs/adr/0003-at-least-once-with-idempotency-at-every-hop.md)
 applies.
 
+The SES side (domain identity with DKIM, SPF and DMARC, configuration set, delivery events,
+least-privilege IAM) is provisioned by [`infra/terraform/ses`](infra/terraform/ses/README.md).
+
 The e2e tests and load tests always use the simulated providers (`config/providers.json`).
 
 ## API

@@ -6,7 +6,11 @@
     "priority": 1,
     "ratePerSecond": 1,
     "burst": 1,
-    "ses": { "region": "sa-east-1", "from": "Relay <no-reply@your-verified-domain.com>" }
+    "ses": {
+      "region": "sa-east-1",
+      "from": "Relay <no-reply@your-verified-domain.com>",
+      "configurationSet": "relay"
+    }
   },
   {
     "name": "email-alpha",
@@ -23,7 +27,9 @@
     "priority": 1,
     "ratePerSecond": 1,
     "burst": 1,
-    "twilio": { "from": "+15550000000" }
+    "twilio": {
+      "from": "+15550000000"
+    }
   },
   {
     "name": "sms-alpha",
@@ -40,7 +46,9 @@
     "priority": 1,
     "ratePerSecond": 1,
     "burst": 1,
-    "twilio": { "from": "whatsapp:+14155238886" }
+    "twilio": {
+      "from": "whatsapp:+14155238886"
+    }
   },
   {
     "name": "whatsapp-alpha",
