@@ -50,6 +50,22 @@ describe('ses adapter', () => {
     });
   });
 
+  it('sends the html part next to the text when the message has one', async () => {
+    const seen: unknown[] = [];
+    const clientFor = (): SesSender => ({
+      send: async (command) => {
+        seen.push(command.input);
+        return { MessageId: 'ses-2' };
+      },
+    });
+    await createSesAdapter(clientFor)(provider, { ...envelope, html: '<p>123456</p>' });
+    const body = (seen[0] as { Content: { Simple: { Body: unknown } } }).Content.Simple.Body;
+    assert.deepEqual(body, {
+      Text: { Data: '123456', Charset: 'UTF-8' },
+      Html: { Data: '<p>123456</p>', Charset: 'UTF-8' },
+    });
+  });
+
   it('maps SDK errors through classifySesError', async () => {
     const clientFor = (): SesSender => ({
       send: async () => {

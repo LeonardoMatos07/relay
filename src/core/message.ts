@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { placeholders, renderTemplate, TemplateVariables } from './template';
 
 export const CHANNELS = ['email', 'sms', 'whatsapp', 'push'] as const;
 export type Channel = (typeof CHANNELS)[number];
@@ -9,7 +10,10 @@ export interface SendRequest {
   channel: Channel;
   to: string;
   subject?: string;
+  /** Plain text. For e-mail with `html` it is the text alternative. */
   body: string;
+  /** E-mail only: the HTML part, already rendered when it reaches the workers. */
+  html?: string;
   metadata?: Record<string, string>;
 }
 
@@ -26,6 +30,10 @@ export type ValidationResult = { ok: true; value: SendRequest } | { ok: false; e
 
 const MAX_BODY = 4_000;
 const MAX_SUBJECT = 200;
+const MAX_HTML = 200_000;
+const MAX_VARIABLES = 50;
+const MAX_VARIABLE_VALUE = 2_000;
+const VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const MAX_METADATA_KEYS = 20;
 
 const RECIPIENT_RULES: Record<Channel, { pattern: RegExp; description: string }> = {
@@ -81,17 +89,73 @@ export function validateSendRequest(input: unknown): ValidationResult {
     }
   }
 
+  if (raw.html !== undefined) {
+    if (raw.channel !== 'email') {
+      errors.push('html is only accepted for email');
+    } else if (typeof raw.html !== 'string' || raw.html.trim() === '' || raw.html.length > MAX_HTML) {
+      errors.push(`html must be a non-empty string with at most ${MAX_HTML} characters`);
+    }
+  }
+  const variables = raw.variables === undefined ? undefined : validateVariables(raw.variables, errors);
+
   if (errors.length > 0) return { ok: false, errors };
+
+  let subject = raw.subject as string | undefined;
+  let body = raw.body as string;
+  let html = raw.html as string | undefined;
+  if (variables) {
+    const missing = [subject, body, html]
+      .flatMap((part) => (part === undefined ? [] : placeholders(part)))
+      .filter((name) => !(name in variables));
+    if (missing.length > 0) {
+      return { ok: false, errors: [`variables is missing: ${[...new Set(missing)].join(', ')}`] };
+    }
+    if (subject !== undefined) subject = renderTemplate(subject, variables, 'text');
+    body = renderTemplate(body, variables, 'text');
+    if (html !== undefined) html = renderTemplate(html, variables, 'html');
+    if (subject !== undefined && subject.length > MAX_SUBJECT) {
+      errors.push(`subject must have at most ${MAX_SUBJECT} characters once rendered`);
+    }
+    if (body.length > MAX_BODY) errors.push(`body must have at most ${MAX_BODY} characters once rendered`);
+    if (html !== undefined && html.length > MAX_HTML) {
+      errors.push(`html must have at most ${MAX_HTML} characters once rendered`);
+    }
+    if (errors.length > 0) return { ok: false, errors };
+  }
+
   return {
     ok: true,
     value: {
       channel: raw.channel as Channel,
       to: (raw.to as string).trim(),
-      body: raw.body as string,
-      ...(raw.subject !== undefined ? { subject: raw.subject as string } : {}),
+      body,
+      ...(subject !== undefined ? { subject } : {}),
+      ...(html !== undefined ? { html } : {}),
       ...(raw.metadata !== undefined ? { metadata: raw.metadata as Record<string, string> } : {}),
     },
   };
+}
+
+function validateVariables(input: unknown, errors: string[]): TemplateVariables | undefined {
+  const valid =
+    typeof input === 'object' &&
+    input !== null &&
+    !Array.isArray(input) &&
+    Object.keys(input).length <= MAX_VARIABLES &&
+    Object.entries(input).every(
+      ([name, value]) =>
+        VARIABLE_NAME.test(name) &&
+        ((typeof value === 'string' && value.length <= MAX_VARIABLE_VALUE) ||
+          (typeof value === 'number' && Number.isFinite(value))),
+    );
+  if (!valid) {
+    errors.push(
+      `variables must be an object with up to ${MAX_VARIABLES} entries: names like [A-Za-z_][A-Za-z0-9_]*, ` +
+        `values strings (up to ${MAX_VARIABLE_VALUE} characters) or numbers`,
+    );
+    return undefined;
+  }
+  return input as TemplateVariables;
 }
 
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_\-:.]{8,128}$/;
@@ -110,6 +174,7 @@ export function requestFingerprint(request: SendRequest): string {
     to: request.to,
     subject: request.subject ?? null,
     body: request.body,
+    html: request.html ?? null,
     metadata: request.metadata
       ? Object.fromEntries(Object.entries(request.metadata).sort(([a], [b]) => a.localeCompare(b)))
       : null,

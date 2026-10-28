@@ -138,16 +138,36 @@ The e2e tests and load tests always use the simulated providers (`config/provide
 
 ## API
 
-| Method | Path                            |                                                                                                                                                                                 |
-| ------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST` | `/v1/messages`                  | `202 {id, status}` · `200` + `Idempotent-Replayed: true` for a repeated key and payload · `409` for a repeated key with a different payload · `400` with every validation error |
-| `GET`  | `/v1/messages/:id`              | Status, attempts, provider used, last error, delivery status and receipts                                                                                                                                    |
-| `POST` | `/v1/receipts`                  | Provider-neutral delivery receipt: `202` recorded · `200` duplicate · `404` unknown message · `400` invalid                                                                     |
-| `DELETE` | `/v1/suppressions/:channel/:recipient` | Lifts a suppression                                                                                                                                              |
-| `GET`  | `/health/live`, `/health/ready` | Liveness (process only) and readiness (dependencies of the role)                                                                                                                |
-| `GET`  | `/metrics`                      | Prometheus                                                                                                                                                                      |
+| Method   | Path                                   |                                                                                                                                                                                 |
+| -------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST`   | `/v1/messages`                         | `202 {id, status}` · `200` + `Idempotent-Replayed: true` for a repeated key and payload · `409` for a repeated key with a different payload · `400` with every validation error |
+| `GET`    | `/v1/messages/:id`                     | Status, attempts, provider used, last error, delivery status and receipts                                                                                                       |
+| `POST`   | `/v1/receipts`                         | Provider-neutral delivery receipt: `202` recorded · `200` duplicate · `404` unknown message · `400` invalid                                                                     |
+| `DELETE` | `/v1/suppressions/:channel/:recipient` | Lifts a suppression                                                                                                                                                             |
+| `GET`    | `/health/live`, `/health/ready`        | Liveness (process only) and readiness (dependencies of the role)                                                                                                                |
+| `GET`    | `/metrics`                             | Prometheus                                                                                                                                                                      |
 
 Set `API_KEYS` to require `X-Api-Key`.
+
+## Templates and dynamic fields
+
+Relay holds no templates. Each product sends its own HTML and the values to fill in
+([ADR 8](docs/adr/0008-templates-rendered-by-relay.md)):
+
+```json
+{
+  "channel": "email",
+  "to": "ana@example.com",
+  "subject": "Your code: {{code}}",
+  "body": "Hi {{name}}, your code is {{code}}.",
+  "html": "<h1>Hi {{name}}</h1><p>Your code is <b>{{code}}</b></p>",
+  "variables": { "name": "Ana", "code": "482913" },
+  "metadata": { "product": "energia", "template": "verification-code" }
+}
+```
+
+`{{name}}` is replaced in `subject`, `body` and `html`; in `html` the value is HTML-escaped. A
+placeholder without a variable is a `400`. `html` is for e-mail only.
 
 ## Delivery receipts
 
@@ -183,14 +203,14 @@ it**, including Docker, Redpanda, Postgres, Redis, Prometheus, k6 and the simula
 1 publisher, 2 workers, realistic channel mix (`load/send.js`), simulated providers. Not a
 production figure; it shows the shape of the system and where it saturates first.
 
-| Metric                                   | 250 msg/s for 2 min            | 500 msg/s for 2 min           |
-| ---------------------------------------- | ------------------------------ | ----------------------------- |
-| Accepted (202)                           | 29,920 of 30,000 offered       | 35,585 of 60,000 offered      |
-| `POST /v1/messages` p50 / p95            | 18 ms / 210 ms                 | 1.48 s / 2.65 s               |
-| Delivered to providers                   | 29,920 (100% of accepted)      | all 35,585, after the run     |
-| Peak delivered rate (1 min)              | 250 msg/s                      | not measured                  |
-| End-to-end p50 / p95 / p99               | 258 ms / 709 ms / 1.43 s       | not measured                  |
-| Max outbox age                           | 394 ms                         | not measured                  |
+| Metric                        | 250 msg/s for 2 min       | 500 msg/s for 2 min       |
+| ----------------------------- | ------------------------- | ------------------------- |
+| Accepted (202)                | 29,920 of 30,000 offered  | 35,585 of 60,000 offered  |
+| `POST /v1/messages` p50 / p95 | 18 ms / 210 ms            | 1.48 s / 2.65 s           |
+| Delivered to providers        | 29,920 (100% of accepted) | all 35,585, after the run |
+| Peak delivered rate (1 min)   | 250 msg/s                 | not measured              |
+| End-to-end p50 / p95 / p99    | 258 ms / 709 ms / 1.43 s  | not measured              |
+| Max outbox age                | 394 ms                    | not measured              |
 
 - **One API replica saturates near 290 accepted/s on this machine** (each request is a Postgres
   transaction: message, idempotency key and outbox row). Beyond that k6 drops iterations and

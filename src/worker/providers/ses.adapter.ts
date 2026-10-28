@@ -30,7 +30,10 @@ export function createSesAdapter(clientFor: (region: string) => SesSender = defa
       Content: {
         Simple: {
           Subject: { Data: envelope.subject ?? '', Charset: 'UTF-8' },
-          Body: { Text: { Data: envelope.body, Charset: 'UTF-8' } },
+          Body: {
+            Text: { Data: envelope.body, Charset: 'UTF-8' },
+            ...(envelope.html ? { Html: { Data: envelope.html, Charset: 'UTF-8' } } : {}),
+          },
         },
       },
       ConfigurationSetName: settings.configurationSet,

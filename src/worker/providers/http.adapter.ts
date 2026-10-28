@@ -24,6 +24,7 @@ export function createHttpAdapter(fetchImpl: Fetch = fetch) {
           to: envelope.to,
           subject: envelope.subject,
           body: envelope.body,
+          html: envelope.html,
         }),
         signal: AbortSignal.timeout(provider.timeoutMs ?? 3_000),
       });
