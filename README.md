@@ -178,15 +178,30 @@ how fast the API said "accepted".
 
 ### Results
 
-> To be filled with the output of `make report` after running on a known machine. Record the
-> hardware (CPU, RAM), the number of worker replicas and the provider latencies used.
+Measured on a laptop (Intel i7-7700HQ, 4 cores / 8 threads, 16 GB RAM) running **everything on
+it**, including Docker, Redpanda, Postgres, Redis, Prometheus, k6 and the simulated providers: 1 API,
+1 publisher, 2 workers, realistic channel mix (`load/send.js`), simulated providers. Not a
+production figure; it shows the shape of the system and where it saturates first.
 
-| Metric                     | Value     |
-| -------------------------- | --------- |
-| Accepted by the API        | _pending_ |
-| Delivered to providers     | _pending_ |
-| End-to-end p50 / p95 / p99 | _pending_ |
-| Max outbox age             | _pending_ |
+| Metric                                   | 250 msg/s for 2 min            | 500 msg/s for 2 min           |
+| ---------------------------------------- | ------------------------------ | ----------------------------- |
+| Accepted (202)                           | 29,920 of 30,000 offered       | 35,585 of 60,000 offered      |
+| `POST /v1/messages` p50 / p95            | 18 ms / 210 ms                 | 1.48 s / 2.65 s               |
+| Delivered to providers                   | 29,920 (100% of accepted)      | all 35,585, after the run     |
+| Peak delivered rate (1 min)              | 250 msg/s                      | not measured                  |
+| End-to-end p50 / p95 / p99               | 258 ms / 709 ms / 1.43 s       | not measured                  |
+| Max outbox age                           | 394 ms                         | not measured                  |
+
+- **One API replica saturates near 290 accepted/s on this machine** (each request is a Postgres
+  transaction: message, idempotency key and outbox row). Beyond that k6 drops iterations and
+  latency climbs to seconds; no request failed. The API is stateless, so it scales out.
+- **Delivery keeps up with intake.** After a deliberately bad run (a 65k backlog because no
+  worker consumed three of the channels) two workers drained about 49k messages in roughly 90 s
+  (about 540 msg/s).
+- The k6 thresholds in `load/send.js` were crossed in both runs (p95 just above 200 ms at 250/s);
+  numbers are the real ones, not tuned to pass.
+- Latencies of the simulated providers are tens of milliseconds, so end-to-end times exclude real
+  SES/Twilio network time.
 
 ## Kubernetes
 
