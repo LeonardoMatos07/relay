@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { MessageEnvelope, MessageStatus, partitionKey, SendRequest, topics } from '../core/message';
+import type { DeliveryStatus } from '../core/receipt';
 import { uuidv7 } from '../core/uuidv7';
 import { DatabaseService } from '../infra/database.service';
 
@@ -13,6 +14,8 @@ export interface MessageView {
   channel: string;
   to: string;
   status: MessageStatus;
+  /** What the provider reported afterwards (see receipts); `pending` until it reports. */
+  delivery: DeliveryStatus;
   attempts: number;
   provider: string | null;
   lastError: string | null;
@@ -70,13 +73,14 @@ export class MessagesRepository {
       channel: string;
       recipient: string;
       status: MessageStatus;
+      delivery_status: DeliveryStatus;
       attempts: number;
       provider: string | null;
       last_error: string | null;
       created_at: Date;
       delivered_at: Date | null;
     }>(
-      `SELECT id, channel, recipient, status, attempts, provider, last_error, created_at, delivered_at
+      `SELECT id, channel, recipient, status, delivery_status, attempts, provider, last_error, created_at, delivered_at
        FROM messages WHERE id = $1`,
       [id],
     );
@@ -87,6 +91,7 @@ export class MessagesRepository {
       channel: r.channel,
       to: r.recipient,
       status: r.status,
+      delivery: r.delivery_status,
       attempts: r.attempts,
       provider: r.provider,
       lastError: r.last_error,

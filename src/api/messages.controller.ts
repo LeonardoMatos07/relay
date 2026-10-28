@@ -9,6 +9,7 @@ import {
   Param,
   Post,
   Res,
+  UnprocessableEntityException,
   UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
@@ -16,13 +17,17 @@ import { isValidIdempotencyKey, requestFingerprint, validateSendRequest } from '
 import { httpRequests, idempotentReplays, messagesAccepted } from '../infra/metrics';
 import { ApiKeyGuard } from './api-key.guard';
 import { MessagesRepository } from './messages.repository';
+import { ReceiptsRepository } from './receipts.repository';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 @Controller('v1/messages')
 @UseGuards(ApiKeyGuard)
 export class MessagesController {
-  constructor(private readonly repository: MessagesRepository) {}
+  constructor(
+    private readonly repository: MessagesRepository,
+    private readonly receipts: ReceiptsRepository,
+  ) {}
 
   /**
    * Accepts a message for asynchronous delivery.
@@ -50,6 +55,12 @@ export class MessagesController {
     }
 
     const request = validation.value;
+    if (await this.receipts.isSuppressed(request.channel, request.to)) {
+      httpRequests.inc({ route: 'send', status: 422 });
+      throw new UnprocessableEntityException(
+        'recipient is suppressed after a hard bounce or a complaint; remove it from the suppression list to send again',
+      );
+    }
     const result = await this.repository.accept(request, requestFingerprint(request), idempotencyKey);
 
     switch (result.kind) {
@@ -80,6 +91,6 @@ export class MessagesController {
     const message = await this.repository.find(id);
     httpRequests.inc({ route: 'get', status: message ? 200 : 404 });
     if (!message) throw new NotFoundException();
-    return message;
+    return { ...message, receipts: await this.receipts.forMessage(id) };
   }
 }

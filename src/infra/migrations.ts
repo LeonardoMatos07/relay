@@ -39,4 +39,40 @@ export const MIGRATIONS: ReadonlyArray<{ id: string; sql: string }> = [
       );
     `,
   },
+  {
+    id: '002_receipts_and_suppressions',
+    sql: `
+      -- What the provider said later about a message (delivered, bounced, complained...).
+      -- Distinct from messages.status, which only says whether the provider accepted it.
+      ALTER TABLE messages
+        ADD COLUMN delivery_status text NOT NULL DEFAULT 'pending'
+        CHECK (delivery_status IN ('pending', 'sent', 'delayed', 'delivered', 'bounced', 'rejected', 'complained'));
+
+      CREATE INDEX messages_provider_message_idx ON messages (provider, provider_message_id)
+        WHERE provider_message_id IS NOT NULL;
+
+      -- The id is the provider event's stable id, so a receipt delivered twice is stored once.
+      CREATE TABLE receipts (
+        id          text PRIMARY KEY,
+        message_id  uuid NOT NULL REFERENCES messages (id),
+        provider    text NOT NULL,
+        type        text NOT NULL,
+        permanent   boolean,
+        reason      text,
+        occurred_at timestamptz NOT NULL,
+        created_at  timestamptz NOT NULL DEFAULT now()
+      );
+      CREATE INDEX receipts_message_idx ON receipts (message_id, occurred_at);
+
+      -- Recipients that bounced for good or complained: the API refuses to send to them again.
+      CREATE TABLE suppressions (
+        channel    text NOT NULL,
+        recipient  text NOT NULL,
+        reason     text NOT NULL,
+        receipt_id text REFERENCES receipts (id),
+        created_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY (channel, recipient)
+      );
+    `,
+  },
 ];

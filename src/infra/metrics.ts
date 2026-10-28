@@ -25,6 +25,13 @@ export const idempotentReplays = new Counter({
   registers: [registry],
 });
 
+export const receiptsRecorded = new Counter({
+  name: 'relay_receipts_total',
+  help: 'Delivery receipts received from providers',
+  labelNames: ['provider', 'type', 'outcome'] as const,
+  registers: [registry],
+});
+
 export const outboxPublished = new Counter({
   name: 'relay_outbox_published_total',
   help: 'Outbox rows published to Kafka',

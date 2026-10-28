@@ -36,18 +36,6 @@ jobs:
           kubectl kustomize k8s/base > /dev/null
           kubectl kustomize k8s/overlays/kind > /dev/null
 
-  terraform:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: infra/terraform/ses
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - run: terraform fmt -check -diff
-      - run: terraform init -backend=false
-      - run: terraform validate
-
   e2e:
     needs: checks
     runs-on: ubuntu-latest

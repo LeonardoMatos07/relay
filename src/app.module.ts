@@ -1,6 +1,8 @@
 import { DynamicModule, Module, Provider } from '@nestjs/common';
 import { MessagesController } from './api/messages.controller';
 import { MessagesRepository } from './api/messages.repository';
+import { ReceiptsController } from './api/receipts.controller';
+import { ReceiptsRepository } from './api/receipts.repository';
 import { ApiKeyGuard } from './api/api-key.guard';
 import { Config, CONFIG } from './config';
 import { ProviderRouter } from './core/provider-router';
@@ -28,7 +30,10 @@ export class AppModule {
     const common: Provider[] = [{ provide: CONFIG, useValue: config }, DatabaseService, KafkaService, RedisService];
 
     const byRole: Record<Config['role'], { controllers: DynamicModule['controllers']; providers: Provider[] }> = {
-      api: { controllers: [MessagesController], providers: [MessagesRepository, ApiKeyGuard] },
+      api: {
+        controllers: [MessagesController, ReceiptsController],
+        providers: [MessagesRepository, ReceiptsRepository, ApiKeyGuard],
+      },
       publisher: { controllers: [], providers: [OutboxPublisher] },
       worker: {
         controllers: [],

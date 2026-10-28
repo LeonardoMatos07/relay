@@ -131,7 +131,8 @@ for them the duplicate window described in [ADR 3](docs/adr/0003-at-least-once-w
 applies.
 
 The SES side (domain identity with DKIM, SPF and DMARC, configuration set, delivery events,
-least-privilege IAM) is provisioned by [`infra/terraform/ses`](infra/terraform/ses/README.md).
+least-privilege IAM) and the delivery-receipts pipeline are provisioned by
+[relay-terraform](https://github.com/LeonardoMatos07/relay-terraform).
 
 The e2e tests and load tests always use the simulated providers (`config/providers.json`).
 
@@ -140,11 +141,30 @@ The e2e tests and load tests always use the simulated providers (`config/provide
 | Method | Path                            |                                                                                                                                                                                 |
 | ------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `POST` | `/v1/messages`                  | `202 {id, status}` · `200` + `Idempotent-Replayed: true` for a repeated key and payload · `409` for a repeated key with a different payload · `400` with every validation error |
-| `GET`  | `/v1/messages/:id`              | Status, attempts, provider used, last error                                                                                                                                     |
+| `GET`  | `/v1/messages/:id`              | Status, attempts, provider used, last error, delivery status and receipts                                                                                                                                    |
+| `POST` | `/v1/receipts`                  | Provider-neutral delivery receipt: `202` recorded · `200` duplicate · `404` unknown message · `400` invalid                                                                     |
+| `DELETE` | `/v1/suppressions/:channel/:recipient` | Lifts a suppression                                                                                                                                              |
 | `GET`  | `/health/live`, `/health/ready` | Liveness (process only) and readiness (dependencies of the role)                                                                                                                |
 | `GET`  | `/metrics`                      | Prometheus                                                                                                                                                                      |
 
 Set `API_KEYS` to require `X-Api-Key`.
+
+## Delivery receipts
+
+Accepting a message is not delivering it: SES can bounce it minutes later. Providers report
+that back, and [relay-receipts](https://github.com/LeonardoMatos07/relay-receipts) (two Python
+Lambdas, infrastructure in [relay-terraform](https://github.com/LeonardoMatos07/relay-terraform))
+turns those callbacks into a neutral receipt and posts it to `POST /v1/receipts`:
+
+```
+Relay -> SES -> SNS -> SQS -> webhook-ses (raw -> neutral) -> SQS -> relay-receipts -> POST /v1/receipts
+```
+
+Relay keeps `delivery_status` (`sent < delayed < delivered < bounced/rejected < complained`) that
+only moves forward, so a late event never undoes a later one, and records every receipt once
+(idempotent by receipt id). A hard bounce or a complaint adds the recipient to a **suppression
+list**, and later `POST /v1/messages` to that recipient answer `422`. See
+[ADR 7](docs/adr/0007-delivery-receipts-and-suppression.md).
 
 ## Load test
 

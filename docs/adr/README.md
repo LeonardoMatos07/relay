@@ -8,3 +8,4 @@
 | [0004](0004-tiered-retry-topics-and-dead-letter.md)           | Tiered retry topics and a dead-letter topic                                |
 | [0005](0005-provider-failover-with-circuit-breakers.md)       | Provider failover with per-process circuit breakers                        |
 | [0006](0006-fleet-wide-rate-limiting.md)                      | Fleet-wide rate limiting with a Redis token bucket and spill-over          |
+| [0007](0007-delivery-receipts-and-suppression.md)             | Delivery receipts from providers, forward-only status and a suppression list |
